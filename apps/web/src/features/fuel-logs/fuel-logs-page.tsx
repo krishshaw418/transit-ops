@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -23,6 +23,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuthStore } from "@/stores/auth-store";
+import { canManageFuelLogs } from "@/lib/permissions";
 import { createFuelLog, getFuelLogs, type CreateFuelLogInput } from "./api";
 
 const initialForm: CreateFuelLogInput = {
@@ -39,6 +41,8 @@ export function FuelLogsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CreateFuelLogInput>(initialForm);
+  const user = useAuthStore((state) => state.user);
+  const canCreate = canManageFuelLogs(user?.role);
 
   const fuelLogsQuery = useQuery({
     queryKey: ["fuel-logs"],
@@ -74,6 +78,16 @@ export function FuelLogsPage() {
     },
   });
 
+  const isSubmitDisabled = useMemo(
+    () =>
+      !form.vehicleId ||
+      form.liters <= 0 ||
+      form.cost < 0 ||
+      (form.odometerKm ?? 0) < 0 ||
+      !form.loggedAt,
+    [form],
+  );
+
   function updateField<K extends keyof CreateFuelLogInput>(
     key: K,
     value: CreateFuelLogInput[K],
@@ -84,12 +98,15 @@ export function FuelLogsPage() {
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!form.loggedAt) {
+      toast.error("Please select a valid logged date and time");
+      return;
+    }
+
     createMutation.mutate({
       ...form,
       tripId: form.tripId || undefined,
-      loggedAt: form.loggedAt
-        ? new Date(form.loggedAt).toISOString()
-        : undefined,
+      loggedAt: new Date(form.loggedAt).toISOString(),
     });
   }
 
@@ -103,116 +120,130 @@ export function FuelLogsPage() {
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Fuel Log
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Fuel Log</DialogTitle>
-            </DialogHeader>
-
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="vehicleId">Vehicle</Label>
-                <select
-                  id="vehicleId"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={form.vehicleId}
-                  onChange={(e) => updateField("vehicleId", e.target.value)}
-                >
-                  <option value="">Select vehicle</option>
-                  {vehiclesQuery.data?.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.registrationNo} - {vehicle.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tripId">Trip (optional)</Label>
-                <select
-                  id="tripId"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={form.tripId}
-                  onChange={(e) => updateField("tripId", e.target.value)}
-                >
-                  <option value="">No trip</option>
-                  {tripsQuery.data?.map((trip) => (
-                    <option key={trip.id} value={trip.id}>
-                      {trip.tripCode} - {trip.source} to {trip.destination}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="liters">Liters</Label>
-                <Input
-                  id="liters"
-                  type="number"
-                  value={form.liters}
-                  onChange={(e) =>
-                    updateField("liters", Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cost">Cost</Label>
-                <Input
-                  id="cost"
-                  type="number"
-                  value={form.cost}
-                  onChange={(e) => updateField("cost", Number(e.target.value))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="odometerKm">Odometer (km)</Label>
-                <Input
-                  id="odometerKm"
-                  type="number"
-                  value={form.odometerKm ?? 0}
-                  onChange={(e) =>
-                    updateField("odometerKm", Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="loggedAt">Logged At</Label>
-                <Input
-                  id="loggedAt"
-                  type="datetime-local"
-                  value={form.loggedAt ?? ""}
-                  onChange={(e) => updateField("loggedAt", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Input
-                  id="notes"
-                  value={form.notes ?? ""}
-                  onChange={(e) => updateField("notes", e.target.value)}
-                />
-              </div>
-
-              <Button
-                className="w-full"
-                disabled={createMutation.isPending}
-                type="submit"
-              >
-                {createMutation.isPending ? "Creating..." : "Create Fuel Log"}
+        {canCreate ? (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Fuel Log
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Fuel Log</DialogTitle>
+              </DialogHeader>
+
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleId">Vehicle</Label>
+                  <select
+                    id="vehicleId"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.vehicleId}
+                    onChange={(e) => updateField("vehicleId", e.target.value)}
+                  >
+                    <option value="">Select vehicle</option>
+                    {vehiclesQuery.data?.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.registrationNo} - {vehicle.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tripId">Trip (optional)</Label>
+                  <select
+                    id="tripId"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.tripId}
+                    onChange={(e) => updateField("tripId", e.target.value)}
+                  >
+                    <option value="">No trip</option>
+                    {tripsQuery.data?.map((trip) => (
+                      <option key={trip.id} value={trip.id}>
+                        {trip.tripCode} - {trip.source} to {trip.destination}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="liters">Liters</Label>
+                  <Input
+                    id="liters"
+                    type="number"
+                    min={0.01}
+                    value={form.liters}
+                    onChange={(e) =>
+                      updateField("liters", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cost">Cost</Label>
+                  <Input
+                    id="cost"
+                    type="number"
+                    min={0}
+                    value={form.cost}
+                    onChange={(e) =>
+                      updateField("cost", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="odometerKm">Odometer (km)</Label>
+                  <Input
+                    id="odometerKm"
+                    type="number"
+                    min={0}
+                    value={form.odometerKm ?? 0}
+                    onChange={(e) =>
+                      updateField("odometerKm", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="loggedAt">Logged At</Label>
+                  <Input
+                    id="loggedAt"
+                    type="datetime-local"
+                    value={form.loggedAt ?? ""}
+                    onChange={(e) => updateField("loggedAt", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Input
+                    id="notes"
+                    value={form.notes ?? ""}
+                    onChange={(e) => updateField("notes", e.target.value)}
+                  />
+                </div>
+
+                {isSubmitDisabled ? (
+                  <p className="text-sm text-muted-foreground">
+                    Select a vehicle, enter liters and cost, and choose a valid
+                    date.
+                  </p>
+                ) : null}
+
+                <Button
+                  className="w-full"
+                  disabled={createMutation.isPending || isSubmitDisabled}
+                  type="submit"
+                >
+                  {createMutation.isPending ? "Creating..." : "Create Fuel Log"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        ) : null}
       </div>
 
       <Card>
@@ -235,36 +266,47 @@ export function FuelLogsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {fuelLogsQuery.data?.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>
-                      <div className="font-medium">
-                        {log.vehicle.registrationNo}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {log.vehicle.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {log.trip ? (
-                        <div>
-                          <div>{log.trip.tripCode}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {log.trip.source} to {log.trip.destination}
-                          </div>
+                {fuelLogsQuery.data?.length ? (
+                  fuelLogsQuery.data.map((log) => (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        <div className="font-medium">
+                          {log.vehicle.registrationNo}
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">No trip</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{log.liters}</TableCell>
-                    <TableCell>{log.cost}</TableCell>
-                    <TableCell>{log.odometerKm ?? "-"}</TableCell>
-                    <TableCell>
-                      {new Date(log.loggedAt).toLocaleString()}
+                        <div className="text-xs text-muted-foreground">
+                          {log.vehicle.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {log.trip ? (
+                          <div>
+                            <div>{log.trip.tripCode}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {log.trip.source} to {log.trip.destination}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">No trip</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{log.liters}</TableCell>
+                      <TableCell>{log.cost}</TableCell>
+                      <TableCell>{log.odometerKm ?? "-"}</TableCell>
+                      <TableCell>
+                        {new Date(log.loggedAt).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-muted-foreground"
+                    >
+                      No fuel logs found.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           )}

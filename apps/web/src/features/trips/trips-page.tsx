@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/table";
 import { getDrivers } from "@/features/drivers/api";
 import { getVehicles } from "@/features/vehicles/api";
+import { useAuthStore } from "@/stores/auth-store";
+import { canManageTrips } from "@/lib/permissions";
 import {
   cancelTrip,
   completeTrip,
@@ -49,25 +51,25 @@ function getTripStatusBadge(status: string) {
   switch (status) {
     case "DRAFT":
       return (
-        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100 px-1 rounded-md">
+        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">
           Draft
         </Badge>
       );
     case "DISPATCHED":
       return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 px-1 rounded-md">
+        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
           Dispatched
         </Badge>
       );
     case "COMPLETED":
       return (
-        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 px-1 rounded-md">
+        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
           Completed
         </Badge>
       );
     case "CANCELLED":
       return (
-        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 px-1 rounded-md">
+        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100">
           Cancelled
         </Badge>
       );
@@ -80,6 +82,8 @@ export function TripsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CreateTripInput>(initialForm);
+  const user = useAuthStore((state) => state.user);
+  const canTripActions = canManageTrips(user?.role);
 
   const tripsQuery = useQuery({
     queryKey: ["trips"],
@@ -172,14 +176,33 @@ export function TripsPage() {
     },
   });
 
-  const availableVehicles = useMemo(
-    () => vehiclesQuery.data ?? [],
+  const selectableVehicles = useMemo(
+    () =>
+      (vehiclesQuery.data ?? []).filter(
+        (vehicle) => vehicle.status === "AVAILABLE",
+      ),
     [vehiclesQuery.data],
   );
 
-  const availableDrivers = useMemo(
-    () => driversQuery.data ?? [],
+  const selectableDrivers = useMemo(
+    () =>
+      (driversQuery.data ?? []).filter(
+        (driver) =>
+          driver.status === "AVAILABLE" &&
+          new Date(driver.licenseExpiryDate) > new Date(),
+      ),
     [driversQuery.data],
+  );
+
+  const isCreateDisabled = useMemo(
+    () =>
+      !form.source.trim() ||
+      !form.destination.trim() ||
+      !form.vehicleId ||
+      !form.driverId ||
+      form.cargoWeightKg <= 0 ||
+      form.plannedDistanceKm <= 0,
+    [form],
   );
 
   function updateField<K extends keyof CreateTripInput>(
@@ -214,105 +237,118 @@ export function TripsPage() {
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Trip
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Trip</DialogTitle>
-            </DialogHeader>
-
-            <form className="space-y-4" onSubmit={handleCreateTrip}>
-              <div className="space-y-2">
-                <Label htmlFor="source">Source</Label>
-                <Input
-                  id="source"
-                  value={form.source}
-                  onChange={(e) => updateField("source", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="destination">Destination</Label>
-                <Input
-                  id="destination"
-                  value={form.destination}
-                  onChange={(e) => updateField("destination", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="vehicleId">Vehicle ID</Label>
-                <select
-                  id="vehicleId"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={form.vehicleId}
-                  onChange={(e) => updateField("vehicleId", e.target.value)}
-                >
-                  <option value="">Select vehicle</option>
-                  {availableVehicles.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.registrationNo} - {vehicle.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="driverId">Driver ID</Label>
-                <select
-                  id="driverId"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={form.driverId}
-                  onChange={(e) => updateField("driverId", e.target.value)}
-                >
-                  <option value="">Select driver</option>
-                  {availableDrivers.map((driver) => (
-                    <option key={driver.id} value={driver.id}>
-                      {driver.name} - {driver.licenseNumber}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cargoWeightKg">Cargo Weight (kg)</Label>
-                <Input
-                  id="cargoWeightKg"
-                  type="number"
-                  value={form.cargoWeightKg}
-                  onChange={(e) =>
-                    updateField("cargoWeightKg", Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="plannedDistanceKm">Planned Distance (km)</Label>
-                <Input
-                  id="plannedDistanceKm"
-                  type="number"
-                  value={form.plannedDistanceKm}
-                  onChange={(e) =>
-                    updateField("plannedDistanceKm", Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <Button
-                className="w-full"
-                disabled={createMutation.isPending}
-                type="submit"
-              >
-                {createMutation.isPending ? "Creating..." : "Create Trip"}
+        {canTripActions ? (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Trip
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Trip</DialogTitle>
+              </DialogHeader>
+
+              <form className="space-y-4" onSubmit={handleCreateTrip}>
+                <div className="space-y-2">
+                  <Label htmlFor="source">Source</Label>
+                  <Input
+                    id="source"
+                    value={form.source}
+                    onChange={(e) => updateField("source", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="destination">Destination</Label>
+                  <Input
+                    id="destination"
+                    value={form.destination}
+                    onChange={(e) => updateField("destination", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleId">Vehicle</Label>
+                  <select
+                    id="vehicleId"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.vehicleId}
+                    onChange={(e) => updateField("vehicleId", e.target.value)}
+                  >
+                    <option value="">Select vehicle</option>
+                    {selectableVehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.registrationNo} - {vehicle.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="driverId">Driver</Label>
+                  <select
+                    id="driverId"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.driverId}
+                    onChange={(e) => updateField("driverId", e.target.value)}
+                  >
+                    <option value="">Select driver</option>
+                    {selectableDrivers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>
+                        {driver.name} - {driver.licenseNumber}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cargoWeightKg">Cargo Weight (kg)</Label>
+                  <Input
+                    id="cargoWeightKg"
+                    type="number"
+                    min={1}
+                    value={form.cargoWeightKg}
+                    onChange={(e) =>
+                      updateField("cargoWeightKg", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="plannedDistanceKm">
+                    Planned Distance (km)
+                  </Label>
+                  <Input
+                    id="plannedDistanceKm"
+                    type="number"
+                    min={1}
+                    value={form.plannedDistanceKm}
+                    onChange={(e) =>
+                      updateField("plannedDistanceKm", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                {isCreateDisabled ? (
+                  <p className="text-sm text-muted-foreground">
+                    Choose an available vehicle and eligible driver, then fill
+                    all required fields.
+                  </p>
+                ) : null}
+
+                <Button
+                  className="w-full"
+                  disabled={createMutation.isPending || isCreateDisabled}
+                  type="submit"
+                >
+                  {createMutation.isPending ? "Creating..." : "Create Trip"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        ) : null}
       </div>
 
       <Card>
@@ -336,81 +372,90 @@ export function TripsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tripsQuery.data?.map((trip) => (
-                  <TableRow key={trip.id}>
-                    <TableCell>
-                      <div className="font-medium">{trip.tripCode}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {trip.plannedDistanceKm} km planned
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>{trip.source}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {trip.destination}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>{trip.vehicle.registrationNo}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {trip.vehicle.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>{trip.driver.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {trip.driver.licenseNumber}
-                      </div>
-                    </TableCell>
-                    <TableCell>{getTripStatusBadge(trip.status)}</TableCell>
-                    <TableCell>{trip.cargoWeightKg} kg</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
-                        {trip.status === "DRAFT" ? (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => dispatchMutation.mutate(trip.id)}
-                              variant="default"
-                            >
-                              Dispatch
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                cancelMutation.mutate({ tripId: trip.id })
-                              }
-                              variant="outline"
-                            >
-                              Cancel
-                            </Button>
-                          </>
-                        ) : null}
+                {tripsQuery.data?.length ? (
+                  tripsQuery.data.map((trip) => (
+                    <TableRow key={trip.id}>
+                      <TableCell>
+                        <div className="font-medium">{trip.tripCode}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {trip.plannedDistanceKm} km planned
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>{trip.source}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {trip.destination}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>{trip.vehicle.registrationNo}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {trip.vehicle.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>{trip.driver.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {trip.driver.licenseNumber}
+                        </div>
+                      </TableCell>
+                      <TableCell>{getTripStatusBadge(trip.status)}</TableCell>
+                      <TableCell>{trip.cargoWeightKg} kg</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          {trip.status === "DRAFT" && canTripActions ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => dispatchMutation.mutate(trip.id)}
+                              >
+                                Dispatch
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  cancelMutation.mutate({ tripId: trip.id })
+                                }
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          ) : null}
 
-                        {trip.status === "DISPATCHED" ? (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => handleQuickComplete(trip)}
-                              variant="default"
-                            >
-                              Complete
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                cancelMutation.mutate({ tripId: trip.id })
-                              }
-                              variant="outline"
-                            >
-                              Cancel
-                            </Button>
-                          </>
-                        ) : null}
-                      </div>
+                          {trip.status === "DISPATCHED" && canTripActions ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleQuickComplete(trip)}
+                              >
+                                Complete
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  cancelMutation.mutate({ tripId: trip.id })
+                                }
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="text-center text-muted-foreground"
+                    >
+                      No trips found.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           )}

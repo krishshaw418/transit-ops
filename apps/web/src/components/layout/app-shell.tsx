@@ -2,22 +2,56 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 import { toast } from "sonner";
-
-const navItems = [
-  { to: "/", label: "Dashboard" },
-  { to: "/vehicles", label: "Vehicles" },
-  { to: "/drivers", label: "Drivers" },
-  { to: "/trips", label: "Trips" },
-  { to: "/maintenance", label: "Maintenance" },
-  { to: "/fuel-logs", label: "Fuel Logs" },
-  { to: "/expenses", label: "Expenses" },
-  { to: "/reports", label: "Reports" },
-];
+import {
+  canManageDrivers,
+  canManageExpenses,
+  canManageFuelLogs,
+  canManageMaintenance,
+  canManageTrips,
+  canManageVehicles,
+  canViewDashboard,
+  canViewReports,
+} from "@/lib/permissions";
 
 export function AppShell() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const clearSession = useAuthStore((state) => state.clearSession);
+
+  const navItems = [
+    { to: "/", label: "Dashboard", visible: canViewDashboard(user?.role) },
+    {
+      to: "/vehicles",
+      label: "Vehicles",
+      visible: canManageVehicles(user?.role) || !!user,
+    },
+    {
+      to: "/drivers",
+      label: "Drivers",
+      visible: canManageDrivers(user?.role) || !!user,
+    },
+    {
+      to: "/trips",
+      label: "Trips",
+      visible: canManageTrips(user?.role) || !!user,
+    },
+    {
+      to: "/maintenance",
+      label: "Maintenance",
+      visible: canManageMaintenance(user?.role) || !!user,
+    },
+    {
+      to: "/fuel-logs",
+      label: "Fuel Logs",
+      visible: canManageFuelLogs(user?.role) || !!user,
+    },
+    {
+      to: "/expenses",
+      label: "Expenses",
+      visible: canManageExpenses(user?.role) || !!user,
+    },
+    { to: "/reports", label: "Reports", visible: canViewReports(user?.role) },
+  ].filter((item) => item.visible);
 
   function handleLogout() {
     clearSession();

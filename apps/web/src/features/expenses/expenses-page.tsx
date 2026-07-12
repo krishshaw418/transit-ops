@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +24,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuthStore } from "@/stores/auth-store";
+import { canManageExpenses } from "@/lib/permissions";
 import {
   createExpense,
   getExpenses,
@@ -44,31 +46,31 @@ function getExpenseBadge(type: ExpenseType) {
   switch (type) {
     case "FUEL":
       return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 px-1 rounded-md">
+        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
           Fuel
         </Badge>
       );
     case "MAINTENANCE":
       return (
-        <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 px-1 rounded-md">
+        <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">
           Maintenance
         </Badge>
       );
     case "TOLL":
       return (
-        <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100 px-1 rounded-md">
+        <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100">
           Toll
         </Badge>
       );
     case "REPAIR":
       return (
-        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 px-1 rounded-md">
+        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100">
           Repair
         </Badge>
       );
     case "OTHER":
       return (
-        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100 px-1 rounded-md">
+        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">
           Other
         </Badge>
       );
@@ -81,6 +83,8 @@ export function ExpensesPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<CreateExpenseInput>(initialForm);
+  const user = useAuthStore((state) => state.user);
+  const canCreate = canManageExpenses(user?.role);
 
   const expensesQuery = useQuery({
     queryKey: ["expenses"],
@@ -115,6 +119,11 @@ export function ExpensesPage() {
     },
   });
 
+  const isSubmitDisabled = useMemo(
+    () => !form.vehicleId || form.amount < 0 || !form.expenseDate,
+    [form],
+  );
+
   function updateField<K extends keyof CreateExpenseInput>(
     key: K,
     value: CreateExpenseInput[K],
@@ -124,6 +133,11 @@ export function ExpensesPage() {
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!form.expenseDate) {
+      toast.error("Please select a valid expense date and time");
+      return;
+    }
 
     createMutation.mutate({
       ...form,
@@ -142,112 +156,122 @@ export function ExpensesPage() {
           </p>
         </div>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Expense
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Expense</DialogTitle>
-            </DialogHeader>
-
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="vehicleId">Vehicle</Label>
-                <select
-                  id="vehicleId"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={form.vehicleId}
-                  onChange={(e) => updateField("vehicleId", e.target.value)}
-                >
-                  <option value="">Select vehicle</option>
-                  {vehiclesQuery.data?.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.registrationNo} - {vehicle.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tripId">Trip (optional)</Label>
-                <select
-                  id="tripId"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={form.tripId}
-                  onChange={(e) => updateField("tripId", e.target.value)}
-                >
-                  <option value="">No trip</option>
-                  {tripsQuery.data?.map((trip) => (
-                    <option key={trip.id} value={trip.id}>
-                      {trip.tripCode} - {trip.source} to {trip.destination}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="type">Expense Type</Label>
-                <select
-                  id="type"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  value={form.type}
-                  onChange={(e) =>
-                    updateField("type", e.target.value as ExpenseType)
-                  }
-                >
-                  <option value="FUEL">Fuel</option>
-                  <option value="MAINTENANCE">Maintenance</option>
-                  <option value="TOLL">Toll</option>
-                  <option value="REPAIR">Repair</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  value={form.amount}
-                  onChange={(e) =>
-                    updateField("amount", Number(e.target.value))
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expenseDate">Expense Date</Label>
-                <Input
-                  id="expenseDate"
-                  type="datetime-local"
-                  value={form.expenseDate}
-                  onChange={(e) => updateField("expenseDate", e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  value={form.description ?? ""}
-                  onChange={(e) => updateField("description", e.target.value)}
-                />
-              </div>
-
-              <Button
-                className="w-full"
-                disabled={createMutation.isPending}
-                type="submit"
-              >
-                {createMutation.isPending ? "Creating..." : "Create Expense"}
+        {canCreate ? (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Expense
               </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Expense</DialogTitle>
+              </DialogHeader>
+
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <div className="space-y-2">
+                  <Label htmlFor="vehicleId">Vehicle</Label>
+                  <select
+                    id="vehicleId"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.vehicleId}
+                    onChange={(e) => updateField("vehicleId", e.target.value)}
+                  >
+                    <option value="">Select vehicle</option>
+                    {vehiclesQuery.data?.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.registrationNo} - {vehicle.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tripId">Trip (optional)</Label>
+                  <select
+                    id="tripId"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.tripId}
+                    onChange={(e) => updateField("tripId", e.target.value)}
+                  >
+                    <option value="">No trip</option>
+                    {tripsQuery.data?.map((trip) => (
+                      <option key={trip.id} value={trip.id}>
+                        {trip.tripCode} - {trip.source} to {trip.destination}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="type">Expense Type</Label>
+                  <select
+                    id="type"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={form.type}
+                    onChange={(e) =>
+                      updateField("type", e.target.value as ExpenseType)
+                    }
+                  >
+                    <option value="FUEL">Fuel</option>
+                    <option value="MAINTENANCE">Maintenance</option>
+                    <option value="TOLL">Toll</option>
+                    <option value="REPAIR">Repair</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Amount</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    min={0}
+                    value={form.amount}
+                    onChange={(e) =>
+                      updateField("amount", Number(e.target.value))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="expenseDate">Expense Date</Label>
+                  <Input
+                    id="expenseDate"
+                    type="datetime-local"
+                    value={form.expenseDate}
+                    onChange={(e) => updateField("expenseDate", e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Input
+                    id="description"
+                    value={form.description ?? ""}
+                    onChange={(e) => updateField("description", e.target.value)}
+                  />
+                </div>
+
+                {isSubmitDisabled ? (
+                  <p className="text-sm text-muted-foreground">
+                    Select a vehicle, add an amount, and choose a valid expense
+                    date.
+                  </p>
+                ) : null}
+
+                <Button
+                  className="w-full"
+                  disabled={createMutation.isPending || isSubmitDisabled}
+                  type="submit"
+                >
+                  {createMutation.isPending ? "Creating..." : "Create Expense"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        ) : null}
       </div>
 
       <Card>
@@ -270,36 +294,48 @@ export function ExpensesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expensesQuery.data?.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>
-                      <div className="font-medium">
-                        {expense.vehicle.registrationNo}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {expense.vehicle.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {expense.trip ? (
-                        <div>
-                          <div>{expense.trip.tripCode}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {expense.trip.source} to {expense.trip.destination}
-                          </div>
+                {expensesQuery.data?.length ? (
+                  expensesQuery.data.map((expense) => (
+                    <TableRow key={expense.id}>
+                      <TableCell>
+                        <div className="font-medium">
+                          {expense.vehicle.registrationNo}
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">No trip</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{getExpenseBadge(expense.type)}</TableCell>
-                    <TableCell>{expense.amount}</TableCell>
-                    <TableCell>{expense.description ?? "-"}</TableCell>
-                    <TableCell>
-                      {new Date(expense.expenseDate).toLocaleString()}
+                        <div className="text-xs text-muted-foreground">
+                          {expense.vehicle.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {expense.trip ? (
+                          <div>
+                            <div>{expense.trip.tripCode}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {expense.trip.source} to{" "}
+                              {expense.trip.destination}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">No trip</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{getExpenseBadge(expense.type)}</TableCell>
+                      <TableCell>{expense.amount}</TableCell>
+                      <TableCell>{expense.description ?? "-"}</TableCell>
+                      <TableCell>
+                        {new Date(expense.expenseDate).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-center text-muted-foreground"
+                    >
+                      No expenses found.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           )}
