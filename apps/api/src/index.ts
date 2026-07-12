@@ -1,9 +1,11 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
+import { env } from "./config/env";
+import { errorHandler } from "./middlewares/error.middleware";
+import routes from "./routes";
 
 const app = express();
-const port = Number(process.env.PORT ?? 3000);
 
 app.use(
   cors({
@@ -12,10 +14,9 @@ app.use(
 );
 app.use(express.json());
 
-app.get("/health", (req, res) => {
-  res.status(200).json({ success: true, message: "Server is up and running." });
-});
+app.use("/api", routes);
+app.use(errorHandler);
 
-app.listen(port, () => {
-    console.log(`Listening on port: ${port}...`);
-})
+app.listen(env.PORT, () => {
+  console.log(`API listening on http://localhost:${env.PORT}`);
+});
