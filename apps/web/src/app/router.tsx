@@ -4,6 +4,12 @@ import { LoginPage } from "@/features/auth/login-page";
 import { ProtectedRoute } from "@/features/auth/protected-route";
 import { DashboardPage } from "@/features/dashboard/dashboard-page";
 import { VehiclesPage } from "@/features/vehicles/vehicles-page";
+import { DriversPage } from "@/features/drivers/drivers-page";
+import { TripsPage } from "@/features/trips/trips-page";
+import { MaintenancePage } from "@/features/maintenance/maintenance-page";
+import { FuelLogsPage } from "@/features/fuel-logs/fuel-logs-page";
+import { ExpensesPage } from "@/features/expenses/expenses-page";
+import { ReportsPage } from "@/features/reports/reports-page";
 
 function PlaceholderPage({ title }: { title: string }) {
   return <div className="p-6 text-lg">{title} page coming next.</div>;
@@ -22,18 +28,18 @@ export const router = createBrowserRouter([
         children: [
           { path: "/", element: <DashboardPage /> },
           { path: "/vehicles", element: <VehiclesPage /> },
-          { path: "/drivers", element: <PlaceholderPage title="Drivers" /> },
-          { path: "/trips", element: <PlaceholderPage title="Trips" /> },
+          { path: "/drivers", element: <DriversPage /> },
+          { path: "/trips", element: <TripsPage /> },
           {
             path: "/maintenance",
-            element: <PlaceholderPage title="Maintenance" />,
+            element: <MaintenancePage />,
           },
           {
             path: "/fuel-logs",
-            element: <PlaceholderPage title="Fuel Logs" />,
+            element: <FuelLogsPage />,
           },
-          { path: "/expenses", element: <PlaceholderPage title="Expenses" /> },
-          { path: "/reports", element: <PlaceholderPage title="Reports" /> },
+          { path: "/expenses", element: <ExpensesPage /> },
+          { path: "/reports", element: <ReportsPage /> },
         ],
       },
     ],
