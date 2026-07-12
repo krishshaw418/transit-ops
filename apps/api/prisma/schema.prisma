@@ -12,3 +12,190 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum UserRole {
+  ADMIN
+  FLEET_MANAGER
+  DRIVER
+  SAFETY_OFFICER
+  FINANCIAL_ANALYST
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  ON_TRIP
+  IN_SHOP
+  RETIRED
+}
+
+enum DriverStatus {
+  AVAILABLE
+  ON_TRIP
+  OFF_DUTY
+  SUSPENDED
+}
+
+enum TripStatus {
+  DRAFT
+  DISPATCHED
+  COMPLETED
+  CANCELLED
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ExpenseType {
+  FUEL
+  MAINTENANCE
+  TOLL
+  REPAIR
+  OTHER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdTrips           Trip[]           @relation("TripCreatedBy")
+  createdMaintenanceLogs MaintenanceLog[] @relation("MaintenanceCreatedBy")
+}
+
+model Vehicle {
+  id                String        @id @default(cuid())
+  registrationNo    String        @unique
+  name              String
+  model             String?
+  type              String
+  maxLoadCapacityKg Float
+  odometerKm        Float         @default(0)
+  acquisitionCost   Decimal       @db.Decimal(12, 2)
+  status            VehicleStatus @default(AVAILABLE)
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  trips           Trip[]
+  maintenanceLogs MaintenanceLog[]
+  fuelLogs        FuelLog[]
+  expenses        Expense[]
+}
+
+model Driver {
+  id                String       @id @default(cuid())
+  name              String
+  licenseNumber     String       @unique
+  licenseCategory   String
+  licenseExpiryDate DateTime
+  contactNumber     String
+  safetyScore       Int          @default(100)
+  status            DriverStatus @default(AVAILABLE)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  trips Trip[]
+}
+
+model Trip {
+  id                 String     @id @default(cuid())
+  tripCode           String     @unique
+  source             String
+  destination        String
+  cargoWeightKg      Float
+  plannedDistanceKm  Float
+  actualDistanceKm   Float?
+  revenue            Decimal?   @db.Decimal(12, 2)
+  fuelConsumedLiters Float?
+  status             TripStatus @default(DRAFT)
+  dispatchedAt       DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  notes              String?
+
+  vehicleId   String
+  driverId    String
+  createdById String
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  driver    Driver  @relation(fields: [driverId], references: [id])
+  createdBy User    @relation("TripCreatedBy", fields: [createdById], references: [id])
+
+  fuelLogs FuelLog[]
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vehicleId, status])
+  @@index([driverId, status])
+}
+
+model MaintenanceLog {
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  status      MaintenanceStatus @default(OPEN)
+  openedAt    DateTime          @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  cost        Decimal?          @db.Decimal(12, 2)
+  notes       String?
+
+  vehicleId   String
+  createdById String
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  createdBy User    @relation("MaintenanceCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vehicleId, status])
+}
+
+model FuelLog {
+  id         String   @id @default(cuid())
+  liters     Float
+  cost       Decimal  @db.Decimal(12, 2)
+  odometerKm Float?
+  loggedAt   DateTime @default(now())
+  notes      String?
+
+  vehicleId String
+  tripId    String?
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  trip    Trip?   @relation(fields: [tripId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vehicleId, loggedAt])
+}
+
+model Expense {
+  id          String      @id @default(cuid())
+  type        ExpenseType
+  amount      Decimal     @db.Decimal(12, 2)
+  description String?
+  expenseDate DateTime
+  vehicleId   String
+  tripId      String?
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  trip    Trip?   @relation(fields: [tripId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vehicleId, expenseDate])
+}
