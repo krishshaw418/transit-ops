@@ -46,25 +46,25 @@ function getExpenseBadge(type: ExpenseType) {
   switch (type) {
     case "FUEL":
       return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 rounded-md px-1">
           Fuel
         </Badge>
       );
     case "MAINTENANCE":
       return (
-        <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">
+        <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 rounded-md px-1">
           Maintenance
         </Badge>
       );
     case "TOLL":
       return (
-        <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100">
+        <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100 rounded-md px-1">
           Toll
         </Badge>
       );
     case "REPAIR":
       return (
-        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100">
+        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 rounded-md px-1">
           Repair
         </Badge>
       );

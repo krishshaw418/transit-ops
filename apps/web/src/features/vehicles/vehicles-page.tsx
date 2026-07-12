@@ -30,25 +30,25 @@ function getVehicleStatusBadge(status: string) {
   switch (status) {
     case "AVAILABLE":
       return (
-        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 rounded-md px-1">
           Available
         </Badge>
       );
     case "ON_TRIP":
       return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 rounded-md px-1">
           On Trip
         </Badge>
       );
     case "IN_SHOP":
       return (
-        <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">
+        <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 rounded-md px-1">
           In Shop
         </Badge>
       );
     case "RETIRED":
       return (
-        <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200">
+        <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200 rounded-md px-1">
           Retired
         </Badge>
       );

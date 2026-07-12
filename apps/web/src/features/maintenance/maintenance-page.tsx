@@ -44,25 +44,25 @@ function getMaintenanceBadge(status: string) {
   switch (status) {
     case "OPEN":
       return (
-        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">
+        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100 rounded-md px-1">
           Open
         </Badge>
       );
     case "IN_PROGRESS":
       return (
-        <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">
+        <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100 rounded-md px-1">
           In Progress
         </Badge>
       );
     case "COMPLETED":
       return (
-        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 rounded-md px-1">
           Completed
         </Badge>
       );
     case "CANCELLED":
       return (
-        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100">
+        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 rounded-md px-1">
           Cancelled
         </Badge>
       );

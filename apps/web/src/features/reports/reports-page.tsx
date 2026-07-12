@@ -1,6 +1,18 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,6 +24,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getReports } from "./api";
+import { getTrips } from "@/features/trips/api";
+
+function coerceNumber(value: unknown) {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  return 0;
+}
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -43,7 +62,7 @@ function getStatusBadge(status: string) {
       );
     case "RETIRED":
       return (
-        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">
+        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100 rounded-md px-1">
           Retired
         </Badge>
       );
@@ -52,10 +71,17 @@ function getStatusBadge(status: string) {
   }
 }
 
+const pieColors = ["#2563eb", "#16a34a", "#eab308", "#e11d48"];
+
 export function ReportsPage() {
   const reportsQuery = useQuery({
     queryKey: ["dashboard-reports"],
     queryFn: getReports,
+  });
+
+  const tripsQuery = useQuery({
+    queryKey: ["trips"],
+    queryFn: getTrips,
   });
 
   useEffect(() => {
@@ -68,7 +94,7 @@ export function ReportsPage() {
     }
   }, [reportsQuery.isError, reportsQuery.error]);
 
-  if (reportsQuery.isLoading) {
+  if (reportsQuery.isLoading || tripsQuery.isLoading) {
     return <div className="p-6">Loading reports...</div>;
   }
 
@@ -77,16 +103,11 @@ export function ReportsPage() {
   }
 
   const { totals, vehicles } = reportsQuery.data;
+  const trips = tripsQuery.data ?? [];
 
   const summaryCards = [
-    {
-      title: "Total Fuel Cost",
-      value: formatCurrency(totals.totalFuelCost),
-    },
-    {
-      title: "Other Expenses",
-      value: formatCurrency(totals.totalExpenseCost),
-    },
+    { title: "Total Fuel Cost", value: formatCurrency(totals.totalFuelCost) },
+    { title: "Other Expenses", value: formatCurrency(totals.totalExpenseCost) },
     {
       title: "Operational Cost",
       value: formatCurrency(totals.totalOperationalCost),
@@ -95,15 +116,31 @@ export function ReportsPage() {
       title: "Fuel Efficiency",
       value: `${totals.fuelEfficiency.toFixed(2)} km/L`,
     },
-    {
-      title: "Distance Covered",
-      value: `${totals.totalDistance} km`,
-    },
-    {
-      title: "Fuel Consumed",
-      value: `${totals.totalFuelLiters} L`,
-    },
+    { title: "Distance Covered", value: `${totals.totalDistance} km` },
+    { title: "Fuel Consumed", value: `${totals.totalFuelLiters} L` },
   ];
+
+  const tripStatusCounts = trips.reduce<Record<string, number>>((acc, trip) => {
+    acc[trip.status] = (acc[trip.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const tripStatusData = ["DRAFT", "DISPATCHED", "COMPLETED", "CANCELLED"].map(
+    (status) => ({
+      name: status,
+      value: tripStatusCounts[status] ?? 0,
+    }),
+  );
+
+  const costByVehicleData = vehicles.map((vehicle) => ({
+    name: vehicle.registrationNo,
+    cost: vehicle.totalOperationalCost,
+  }));
+
+  const fuelEfficiencyData = vehicles.map((vehicle) => ({
+    name: vehicle.registrationNo,
+    efficiency: Number(vehicle.fuelEfficiency.toFixed(2)),
+  }));
 
   return (
     <div className="space-y-6 p-6">
@@ -129,6 +166,73 @@ export function ReportsPage() {
         ))}
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card className="xl:col-span-1">
+          <CardHeader>
+            <CardTitle>Trip Status Distribution</CardTitle>
+          </CardHeader>
+          <CardContent className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={tripStatusData}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={110}
+                  label
+                >
+                  {tripStatusData.map((entry, index) => (
+                    <Cell
+                      key={entry.name}
+                      fill={pieColors[index % pieColors.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Operational Cost by Vehicle</CardTitle>
+          </CardHeader>
+          <CardContent className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={costByVehicleData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip
+                  formatter={(value) => formatCurrency(coerceNumber(value))}
+                />
+                <Bar dataKey="cost" fill="#2563eb" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Fuel Efficiency by Vehicle</CardTitle>
+        </CardHeader>
+        <CardContent className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={fuelEfficiencyData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip
+                formatter={(value) => formatCurrency(coerceNumber(value))}
+              />
+              <Bar dataKey="efficiency" fill="#16a34a" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Vehicle Analytics</CardTitle>
@@ -148,37 +252,50 @@ export function ReportsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {vehicles.map((vehicle) => (
-                <TableRow key={vehicle.vehicleId}>
-                  <TableCell>
-                    <div className="font-medium">{vehicle.registrationNo}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {vehicle.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(vehicle.status)}</TableCell>
-                  <TableCell>{formatCurrency(vehicle.revenue)}</TableCell>
-                  <TableCell>{formatCurrency(vehicle.fuelCost)}</TableCell>
-                  <TableCell>{formatCurrency(vehicle.otherCosts)}</TableCell>
-                  <TableCell>
-                    {formatCurrency(vehicle.totalOperationalCost)}
-                  </TableCell>
-                  <TableCell>
-                    {vehicle.fuelEfficiency.toFixed(2)} km/L
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={
-                        vehicle.roi >= 0
-                          ? "text-emerald-700 font-medium"
-                          : "text-rose-700 font-medium"
-                      }
-                    >
-                      {vehicle.roi.toFixed(2)}%
-                    </span>
+              {vehicles.length ? (
+                vehicles.map((vehicle) => (
+                  <TableRow key={vehicle.vehicleId}>
+                    <TableCell>
+                      <div className="font-medium">
+                        {vehicle.registrationNo}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {vehicle.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(vehicle.status)}</TableCell>
+                    <TableCell>{formatCurrency(vehicle.revenue)}</TableCell>
+                    <TableCell>{formatCurrency(vehicle.fuelCost)}</TableCell>
+                    <TableCell>{formatCurrency(vehicle.otherCosts)}</TableCell>
+                    <TableCell>
+                      {formatCurrency(vehicle.totalOperationalCost)}
+                    </TableCell>
+                    <TableCell>
+                      {vehicle.fuelEfficiency.toFixed(2)} km/L
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={
+                          vehicle.roi >= 0
+                            ? "text-emerald-700 font-medium"
+                            : "text-rose-700 font-medium"
+                        }
+                      >
+                        {vehicle.roi.toFixed(2)}%
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="text-center text-muted-foreground"
+                  >
+                    No vehicle analytics available.
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </CardContent>

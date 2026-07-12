@@ -51,25 +51,25 @@ function getTripStatusBadge(status: string) {
   switch (status) {
     case "DRAFT":
       return (
-        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100">
+        <Badge className="bg-slate-100 text-slate-800 hover:bg-slate-100 rounded-md px-1">
           Draft
         </Badge>
       );
     case "DISPATCHED":
       return (
-        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 rounded-md px-1">
           Dispatched
         </Badge>
       );
     case "COMPLETED":
       return (
-        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 rounded-md px-1">
           Completed
         </Badge>
       );
     case "CANCELLED":
       return (
-        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100">
+        <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 rounded-md px-1">
           Cancelled
         </Badge>
       );
