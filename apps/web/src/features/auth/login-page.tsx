@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { login } from "./api";
 import { useAuthStore } from "@/stores/auth-store";
+import { toast } from "sonner";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -29,9 +30,12 @@ export function LoginPage() {
     try {
       const result = await login({ email, password });
       setSession({ token: result.token, user: result.user });
+      toast.success("Signed in successfully");
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      const message = err instanceof Error ? err.message : "Login failed";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }

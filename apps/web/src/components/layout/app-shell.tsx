@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
+import { toast } from "sonner";
 
 const navItems = [
   { to: "/", label: "Dashboard" },
@@ -20,6 +21,7 @@ export function AppShell() {
 
   function handleLogout() {
     clearSession();
+    toast.success("Logged out successfully");
     navigate("/login", { replace: true });
   }
 
