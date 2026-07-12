@@ -1,0 +1,16 @@
+{
+  "name": "transit-ops",
+  "private": true,
+  "packageManager": "yarn@4.17.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "yarn workspaces foreach -pt run dev",
+    "build": "yarn workspaces foreach -pt run build",
+    "typecheck": "yarn workspaces foreach -pt run typecheck",
+    "db:generate": "yarn workspace @transit-ops/api prisma generate",
+    "db:migrate": "yarn workspace @transit-ops/api prisma migrate dev"
+  }
+}
